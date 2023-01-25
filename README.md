@@ -12,4 +12,6 @@ go build
     createblockchain -address ADDRESS creates a blockchain and sends genesis reward to address
     printchain - Prints the blocks in the chain
     send -from FROM -to TO -amount AMOUNT - Send amount of coins
+    createwallet -  Creates a new Wallet
+    listaddresses - Lists the addresses in our wallet file
 ```

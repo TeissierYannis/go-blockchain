@@ -9,27 +9,32 @@ import (
 )
 
 const (
-	dbPath      = "./tmp/blocks"
-	dbFile      = "./tmp/blocks/MANIFEST"
-	genesisData = "First Transaction from Genesis"
+	dbPath      = "./tmp/blocks"                   // the path of the badger database
+	dbFile      = "./tmp/blocks/MANIFEST"          // the file that contains the manifest of the badger
+	genesisData = "First Transaction from Genesis" // the data to be used for the first transaction in the blockchain
 )
 
+// Blockchain represents a blockchain with a lastHash and a Badger database
 type Blockchain struct {
-	LastHash []byte
-	Database *badger.DB
+	LastHash []byte     // LastHash is the last block's hash in the blockchain
+	Database *badger.DB // Database is the underlying badger database used to store the blockchain
 }
 
+// BlockchainIterator is used to iterate over a blockchain
 type BlockchainIterator struct {
-	CurrentHash []byte
-	Database    *badger.DB
+	CurrentHash []byte     // CurrentHash is the current block's hash in the iteration
+	Database    *badger.DB // Database is the underlying badger database used to store the blockchain
 }
 
+// DBexists checks if the badger database exists
 func DBexists() bool {
 	if _, err := os.Stat(dbFile); os.IsNotExist(err) {
 		return false
 	}
 	return true
 }
+
+// ContinueBlockChain continues an existing blockchain
 func ContinueBlockChain(address string) *Blockchain {
 	if DBexists() == false {
 		fmt.Println("No existing blockchain found, create one!")
@@ -50,6 +55,7 @@ func ContinueBlockChain(address string) *Blockchain {
 			lastHash = val
 			return nil
 		})
+
 		return err
 	})
 	Handle(err)
@@ -59,6 +65,7 @@ func ContinueBlockChain(address string) *Blockchain {
 	return &chain
 }
 
+// InitBlockChain creates a new blockchain
 func InitBlockChain(address string) *Blockchain {
 	var lastHash []byte
 
@@ -91,6 +98,7 @@ func InitBlockChain(address string) *Blockchain {
 	return &blockchain
 }
 
+// AddBlock adds a new block to the blockchain with the given transactions
 func (chain *Blockchain) AddBlock(transactions []*Transaction) {
 	var lastHash []byte
 
@@ -121,12 +129,14 @@ func (chain *Blockchain) AddBlock(transactions []*Transaction) {
 	Handle(err)
 }
 
+// Iterator returns a new blockchain iterator
 func (chain *Blockchain) Iterator() *BlockchainIterator {
 	iter := &BlockchainIterator{chain.LastHash, chain.Database}
 
 	return iter
 }
 
+// Next returns the next block in the iteration
 func (iter *BlockchainIterator) Next() *Block {
 	var block *Block
 
@@ -136,7 +146,6 @@ func (iter *BlockchainIterator) Next() *Block {
 		var encodedBlock []byte
 		err = item.Value(func(val []byte) error {
 			encodedBlock = val
-
 			return nil
 		})
 		block = Deserialize(encodedBlock)
@@ -150,6 +159,7 @@ func (iter *BlockchainIterator) Next() *Block {
 	return block
 }
 
+// FindUnspentTransactions finds all unspent transactions for a given address
 func (chain *Blockchain) FindUnspentTransactions(address string) []Transaction {
 	var unspentTxs []Transaction
 
@@ -163,6 +173,7 @@ func (chain *Blockchain) FindUnspentTransactions(address string) []Transaction {
 		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID)
 
+			// Outputs loop
 		Outputs:
 			for outIdx, out := range tx.Outputs {
 				if spentTXOs[txID] != nil {
@@ -193,6 +204,7 @@ func (chain *Blockchain) FindUnspentTransactions(address string) []Transaction {
 	return unspentTxs
 }
 
+// FindUTXO finds all unspent transaction outputs for a given address (UTXO : Unspent Transaction Output)
 func (chain *Blockchain) FindUTXO(address string) []TxOutput {
 	var UTXOs []TxOutput
 	unspentTransactions := chain.FindUnspentTransactions(address)
@@ -207,11 +219,12 @@ func (chain *Blockchain) FindUTXO(address string) []TxOutput {
 	return UTXOs
 }
 
+// FindSpendableOutputs finds outputs that can be spent for a given amount and address
 func (chain *Blockchain) FindSpendableOutputs(address string, amount int) (int, map[string][]int) {
 	unspentOuts := make(map[string][]int)
 	unspentTxs := chain.FindUnspentTransactions(address)
 	accumulated := 0
-
+	// Work loop
 Work:
 	for _, tx := range unspentTxs {
 		txID := hex.EncodeToString(tx.ID)

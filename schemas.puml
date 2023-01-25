@@ -1,0 +1,22 @@
+@startuml
+package "Wallet" {
+    [Private Key] -down-> [ecdsa]
+    [ecdsa] -down-> [Public Key]
+    [Public Key] -down-> [sha256]
+    [sha256] -down-> [ripemd160]
+    [ripemd160] -down-> [public key hash]
+    [public key hash] -down-> [2x sha256]
+    [2x sha256] -down-> [4 bytes]
+    [4 bytes] -down-> [checksum]
+    [checksum] -down-> [base 58]
+    [version] -down-> [base 58]
+    [public key hash] -down-> [base 58]
+}
+[base 58] -down-> [Address]
+
+
+package "Blockchain" {
+
+}
+
+@enduml

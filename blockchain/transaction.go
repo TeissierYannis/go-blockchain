@@ -9,23 +9,15 @@ import (
 	"log"
 )
 
+// Transaction struct represents a transaction in the blockchain. It contains the transaction ID, inputs, and outputs.
+
 type Transaction struct {
 	ID      []byte
 	Inputs  []TxInput
 	Outputs []TxOutput
 }
 
-type TxOutput struct {
-	Value  int
-	PubKey string
-}
-
-type TxInput struct {
-	ID  []byte
-	Out int
-	Sig string
-}
-
+// SetID sets the transaction ID by encoding the transaction data and hashing it.
 func (tx *Transaction) SetID() {
 	var encoded bytes.Buffer
 	var hash [32]byte
@@ -37,6 +29,10 @@ func (tx *Transaction) SetID() {
 	hash = sha256.Sum256(encoded.Bytes())
 	tx.ID = hash[:]
 }
+
+// CoinbaseTx creates a new coinbase transaction with the given parameters.
+// CoinbaseTx The function takes the recipient address and an optional data string.
+// CoinbaseTx If data is not provided, it will be set to "Coins to [recipient address]".
 func CoinbaseTx(to, data string) *Transaction {
 	if data == "" {
 		data = fmt.Sprintf("Coins to %s", to)
@@ -51,6 +47,10 @@ func CoinbaseTx(to, data string) *Transaction {
 	return &tx
 }
 
+// NewTransaction creates a new transaction with the given parameters.
+// NewTransaction The function takes the sender and recipient addresses, amount, and a reference to the blockchain.
+// NewTransaction The function uses the FindSpendableOutputs method to find spendable outputs and create the inputs for the new transaction.
+// NewTransaction If the sender does not have enough funds, the function will panic.
 func NewTransaction(from, to string, amount int, chain *Blockchain) *Transaction {
 	var inputs []TxInput
 	var outputs []TxOutput
@@ -83,14 +83,7 @@ func NewTransaction(from, to string, amount int, chain *Blockchain) *Transaction
 	return &tx
 }
 
+// IsCoinbase checks if a transaction is a coinbase transaction
 func (tx *Transaction) IsCoinbase() bool {
 	return len(tx.Inputs) == 1 && len(tx.Inputs[0].ID) == 0 && tx.Inputs[0].Out == -1
-}
-
-func (in *TxInput) CanUnlock(data string) bool {
-	return in.Sig == data
-}
-
-func (out *TxOutput) CanBeUnlocked(data string) bool {
-	return out.PubKey == data
 }

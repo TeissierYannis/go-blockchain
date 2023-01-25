@@ -1,4 +1,6 @@
 .idea
 fr.YT.blockchain.iml
 tmp/blocks/*
+tmp/wallets.data
 fr.YT.blockchain
+vendor
