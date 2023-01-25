@@ -1,24 +1,43 @@
 package blockchain
 
+import (
+	"bytes"
+	"fr.YT.blockchain/wallet"
+)
+
 // TxOutput represents a transaction output, which contains a value and a public key.
 type TxOutput struct {
-	Value  int
-	PubKey string
+	Value      int
+	PubKeyHash []byte
 }
 
 // TxInput represents a transaction input, which contains the ID of the previous transaction, the index of the output it's referencing, and a signature.
 type TxInput struct {
-	ID  []byte
-	Out int
-	Sig string
+	ID        []byte
+	Out       int
+	Signature []byte
+	PubKey    []byte
 }
 
-// CanUnlock is a method on TxInput that checks if the input can be unlocked using the provided data, which is typically the public key of the recipient.
-func (in *TxInput) CanUnlock(data string) bool {
-	return in.Sig == data
+func NewTXOutput(value int, address string) *TxOutput {
+	txo := &TxOutput{value, nil}
+	txo.Lock([]byte(address))
+
+	return txo
 }
 
-// CanBeUnlocked is a method on TxOutput that checks if the output can be unlocked using the provided data, which is typically the public key of the recipient.
-func (out *TxOutput) CanBeUnlocked(data string) bool {
-	return out.PubKey == data
+func (in *TxInput) UsesKey(pubKeyHash []byte) bool {
+	lockingHash := wallet.PublicKeyHash(in.PubKey)
+
+	return bytes.Compare(lockingHash, pubKeyHash) == 0
+}
+
+func (out *TxOutput) Lock(address []byte) {
+	pubKeyHash := wallet.Base58Decode(address)
+	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
+	out.PubKeyHash = pubKeyHash
+}
+
+func (out *TxOutput) IsLockedWithKey(pubKeyHash []byte) bool {
+	return bytes.Compare(out.PubKeyHash, pubKeyHash) == 0
 }

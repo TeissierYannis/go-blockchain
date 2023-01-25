@@ -1,4 +1,11 @@
 @startuml
+' A private key is first generated using the ecdsa algorithm.
+' The ecdsa algorithm is used to generate a public key from the private key.
+' The public key is then passed through the SHA256 hashing algorithm to create a public key hash.
+' The public key hash is then passed through the ripemd160 hashing algorithm to create a public key hash.
+' The public key hash is then passed through two rounds of the SHA256 hashing algorithm to create a checksum.
+' A version byte is added to the public key hash, and the checksum is appended to it.
+' The combination of the version, public key hash, and checksum is then encoded using base58 encoding to create the final address.
 package "Wallet" {
     [Private Key] -down-> [ecdsa]
     [ecdsa] -down-> [Public Key]
@@ -14,9 +21,31 @@ package "Wallet" {
 }
 [base 58] -down-> [Address]
 
-
-package "Blockchain" {
-
+package "Transactions" {
+    package "Blockchain" {
+        package "Genesis Block" {
+            package "Input G" {
+                [G - Output 100]
+            }
+        }
+        package "Block 1" {
+            package "Input 1" {
+                    [1 - Output 90]
+                    [1 - Output 10]
+            }
+        }
+        package "Block 2" {
+            package "Input 2" {
+                [2 - Output 10]
+            }
+        }
+    }
+    [User A] -down-> [G - Output 100]
+    [User A] -down-> [1 - Output 90]
+    [User A] -down-> [User B] : 10 Tokens
+    [User B] -down-> [1 - Output 10]
+    [User B] -down-> [User C] : 10 Tokens
+    [User C] -down-> [2 - Output 10]
+    [User B] -down-> [1 - Output 10]
 }
-
 @enduml
