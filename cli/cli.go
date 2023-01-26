@@ -13,19 +13,17 @@ import (
 
 type CommandLine struct{}
 
-// printUsage This method prints the usage message, describing the different commands that the command-line interface (CLI) supports.
 func (cli *CommandLine) printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println(" getbalance -address ADDRESS - get the balance for an address")
 	fmt.Println(" createblockchain -address ADDRESS creates a blockchain and sends genesis reward to address")
 	fmt.Println(" printchain - Prints the blocks in the chain")
 	fmt.Println(" send -from FROM -to TO -amount AMOUNT - Send amount of coins")
-	fmt.Println(" createwallet -  Creates a new Wallet")
+	fmt.Println(" createwallet - Creates a new Wallet")
 	fmt.Println(" listaddresses - Lists the addresses in our wallet file")
-	fmt.Println(" reindexutxo  - Rebuilds the UTXO set")
+	fmt.Println(" reindexutxo - Rebuilds the UTXO set")
 }
 
-// validateArgs This method checks if the number of arguments passed to the CLI is less than 2, and if so, calls the printUsage method and exits the program.
 func (cli *CommandLine) validateArgs() {
 	if len(os.Args) < 2 {
 		cli.printUsage()
@@ -43,7 +41,6 @@ func (cli *CommandLine) reindexUTXO() {
 	fmt.Printf("Done! There are %d transactions in the UTXO set.\n", count)
 }
 
-// listAddresses This method lists all the addresses stored in the wallet file.
 func (cli *CommandLine) listAddresses() {
 	wallets, _ := wallet.CreateWallets()
 	addresses := wallets.GetAllAddresses()
@@ -53,7 +50,6 @@ func (cli *CommandLine) listAddresses() {
 	}
 }
 
-// createWallet  This method creates a new wallet and saves it to the wallet file.
 func (cli *CommandLine) createWallet() {
 	wallets, _ := wallet.CreateWallets()
 	address := wallets.AddWallet()
@@ -62,7 +58,6 @@ func (cli *CommandLine) createWallet() {
 	fmt.Printf("New address is: %s\n", address)
 }
 
-// printChain This method iterates through the blocks in the blockchain and prints information about each block, such as the previous block hash, the block hash, and whether the proof of work is valid.
 func (cli *CommandLine) printChain() {
 	chain := blockchain.ContinueBlockChain("")
 	defer chain.Database.Close()
@@ -71,8 +66,8 @@ func (cli *CommandLine) printChain() {
 	for {
 		block := iter.Next()
 
-		fmt.Printf("Prev. hash: %x\n", block.PrevHash)
 		fmt.Printf("Hash: %x\n", block.Hash)
+		fmt.Printf("Prev. hash: %x\n", block.PrevHash)
 		pow := blockchain.NewProof(block)
 		fmt.Printf("PoW: %s\n", strconv.FormatBool(pow.Validate()))
 		for _, tx := range block.Transactions {
@@ -86,23 +81,22 @@ func (cli *CommandLine) printChain() {
 	}
 }
 
-// createBlockChain This method creates a new blockchain and sends the genesis reward to the provided address.
 func (cli *CommandLine) createBlockChain(address string) {
 	if !wallet.ValidateAddress(address) {
-		log.Panic("Address is not valid")
+		log.Panic("Address is not Valid")
 	}
 	chain := blockchain.InitBlockChain(address)
-	chain.Database.Close()
+	defer chain.Database.Close()
 
 	UTXOSet := blockchain.UTXOSet{chain}
 	UTXOSet.ReIndex()
+
 	fmt.Println("Finished!")
 }
 
-// getBalance This method calculates the balance of a given address by iterating through all the UTXOs associated with that address and summing their values.
 func (cli *CommandLine) getBalance(address string) {
 	if !wallet.ValidateAddress(address) {
-		log.Panic("Address is not valid")
+		log.Panic("Address is not Valid")
 	}
 	chain := blockchain.ContinueBlockChain(address)
 	UTXOSet := blockchain.UTXOSet{chain}
@@ -120,25 +114,24 @@ func (cli *CommandLine) getBalance(address string) {
 	fmt.Printf("Balance of %s: %d\n", address, balance)
 }
 
-// send This method creates a new transaction and adds it to the blockchain.
 func (cli *CommandLine) send(from, to string, amount int) {
 	if !wallet.ValidateAddress(to) {
-		log.Panic("Address is not valid")
+		log.Panic("Address is not Valid")
 	}
 	if !wallet.ValidateAddress(from) {
-		log.Panic("Address is not valid")
+		log.Panic("Address is not Valid")
 	}
 	chain := blockchain.ContinueBlockChain(from)
 	UTXOSet := blockchain.UTXOSet{chain}
 	defer chain.Database.Close()
 
 	tx := blockchain.NewTransaction(from, to, amount, &UTXOSet)
-	block := chain.AddBlock([]*blockchain.Transaction{tx})
+	cbTx := blockchain.CoinbaseTx(from, "")
+	block := chain.AddBlock([]*blockchain.Transaction{cbTx, tx})
 	UTXOSet.Update(block)
 	fmt.Println("Success!")
 }
 
-// Run This method is the entry point of the CLI, it sets up and parses command-line flags and calls the appropriate method based on the command passed to the CLI.
 func (cli *CommandLine) Run() {
 	cli.validateArgs()
 
@@ -172,16 +165,6 @@ func (cli *CommandLine) Run() {
 		if err != nil {
 			log.Panic(err)
 		}
-	case "printchain":
-		err := printChainCmd.Parse(os.Args[2:])
-		if err != nil {
-			log.Panic(err)
-		}
-	case "send":
-		err := sendCmd.Parse(os.Args[2:])
-		if err != nil {
-			log.Panic(err)
-		}
 	case "listaddresses":
 		err := listAddressesCmd.Parse(os.Args[2:])
 		if err != nil {
@@ -189,6 +172,16 @@ func (cli *CommandLine) Run() {
 		}
 	case "createwallet":
 		err := createWalletCmd.Parse(os.Args[2:])
+		if err != nil {
+			log.Panic(err)
+		}
+	case "printchain":
+		err := printChainCmd.Parse(os.Args[2:])
+		if err != nil {
+			log.Panic(err)
+		}
+	case "send":
+		err := sendCmd.Parse(os.Args[2:])
 		if err != nil {
 			log.Panic(err)
 		}
@@ -217,6 +210,16 @@ func (cli *CommandLine) Run() {
 		cli.printChain()
 	}
 
+	if createWalletCmd.Parsed() {
+		cli.createWallet()
+	}
+	if listAddressesCmd.Parsed() {
+		cli.listAddresses()
+	}
+	if reindexUTXOCmd.Parsed() {
+		cli.reindexUTXO()
+	}
+
 	if sendCmd.Parsed() {
 		if *sendFrom == "" || *sendTo == "" || *sendAmount <= 0 {
 			sendCmd.Usage()
@@ -224,17 +227,5 @@ func (cli *CommandLine) Run() {
 		}
 
 		cli.send(*sendFrom, *sendTo, *sendAmount)
-	}
-
-	if createWalletCmd.Parsed() {
-		cli.createWallet()
-	}
-
-	if reindexUTXOCmd.Parsed() {
-		cli.reindexUTXO()
-	}
-
-	if listAddressesCmd.Parsed() {
-		cli.listAddresses()
 	}
 }

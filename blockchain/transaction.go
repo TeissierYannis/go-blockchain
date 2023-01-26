@@ -46,32 +46,24 @@ func (tx *Transaction) Hash() []byte {
 	return hash[:]
 }
 
-// SetID sets the transaction ID by encoding the transaction data and hashing it.
-func (tx *Transaction) SetID() {
-	var encoded bytes.Buffer
-	var hash [32]byte
-
-	encode := gob.NewEncoder(&encoded)
-	err := encode.Encode(tx)
-	Handle(err)
-
-	hash = sha256.Sum256(encoded.Bytes())
-	tx.ID = hash[:]
-}
-
 // CoinbaseTx creates a new coinbase transaction with the given parameters.
 // CoinbaseTx The function takes the recipient address and an optional data string.
 // CoinbaseTx If data is not provided, it will be set to "Coins to [recipient address]".
 func CoinbaseTx(to, data string) *Transaction {
 	if data == "" {
-		data = fmt.Sprintf("Coins to %s", to)
+		randData := make([]byte, 24)
+		_, err := rand.Read(randData)
+		if err != nil {
+			log.Panic(err)
+		}
+		data = fmt.Sprintf("%x", randData)
 	}
 
 	txin := TxInput{[]byte{}, -1, nil, []byte(data)}
-	txout := NewTXOutput(100, to)
+	txout := NewTXOutput(20, to)
 
 	tx := Transaction{nil, []TxInput{txin}, []TxOutput{*txout}}
-	tx.SetID()
+	tx.ID = tx.Hash()
 
 	return &tx
 }

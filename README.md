@@ -14,4 +14,5 @@ go build
     send -from FROM -to TO -amount AMOUNT - Send amount of coins
     createwallet -  Creates a new Wallet
     listaddresses - Lists the addresses in our wallet file
+    reindexutxo - Rebuilds the UTXO set
 ```
