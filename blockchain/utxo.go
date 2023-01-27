@@ -13,10 +13,9 @@ var (
 )
 
 type UTXOSet struct {
-	Blockchain *Blockchain
+	Blockchain *BlockChain
 }
 
-// FindSpendableOutputs finds outputs that can be spent for a given amount and address
 func (u UTXOSet) FindSpendableOutputs(pubKeyHash []byte, amount int) (int, map[string][]int) {
 	unspentOuts := make(map[string][]int)
 	accumulated := 0
@@ -48,7 +47,6 @@ func (u UTXOSet) FindSpendableOutputs(pubKeyHash []byte, amount int) (int, map[s
 				}
 			}
 		}
-
 		return nil
 	})
 	Handle(err)
@@ -56,22 +54,78 @@ func (u UTXOSet) FindSpendableOutputs(pubKeyHash []byte, amount int) (int, map[s
 	return accumulated, unspentOuts
 }
 
-func (u UTXOSet) ReIndex() {
+func (u UTXOSet) FindUnspentTransactions(pubKeyHash []byte) []TxOutput {
+	var UTXOs []TxOutput
+
+	db := u.Blockchain.Database
+
+	err := db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(utxoPrefix); it.ValidForPrefix(utxoPrefix); it.Next() {
+			item := it.Item()
+			var v []byte
+			err := item.Value(func(val []byte) error {
+				v = val
+				return nil
+			})
+			Handle(err)
+			outs := DeserializeOutputs(v)
+			for _, out := range outs.Outputs {
+				if out.IsLockedWithKey(pubKeyHash) {
+					UTXOs = append(UTXOs, out)
+				}
+			}
+
+		}
+		return nil
+	})
+	Handle(err)
+
+	return UTXOs
+}
+
+func (u UTXOSet) CountTransactions() int {
+	db := u.Blockchain.Database
+	counter := 0
+
+	err := db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+
+		it := txn.NewIterator(opts)
+		defer it.Close()
+		for it.Seek(utxoPrefix); it.ValidForPrefix(utxoPrefix); it.Next() {
+			counter++
+		}
+
+		return nil
+	})
+
+	Handle(err)
+
+	return counter
+}
+
+func (u UTXOSet) Reindex() {
 	db := u.Blockchain.Database
 
 	u.DeleteByPrefix(utxoPrefix)
+
 	UTXO := u.Blockchain.FindUTXO()
 
 	err := db.Update(func(txn *badger.Txn) error {
 		for txId, outs := range UTXO {
 			key, err := hex.DecodeString(txId)
-			if err != nil {
-				return err
-			}
+			Handle(err)
 			key = append(utxoPrefix, key...)
+
 			err = txn.Set(key, outs.Serialize())
 			Handle(err)
 		}
+
 		return nil
 	})
 	Handle(err)
@@ -107,7 +161,6 @@ func (u *UTXOSet) Update(block *Block) {
 						if err := txn.Delete(inID); err != nil {
 							log.Panic(err)
 						}
-
 					} else {
 						if err := txn.Set(inID, updatedOuts.Serialize()); err != nil {
 							log.Panic(err)
@@ -115,7 +168,6 @@ func (u *UTXOSet) Update(block *Block) {
 					}
 				}
 			}
-
 			newOutputs := TxOutputs{}
 			for _, out := range tx.Outputs {
 				newOutputs.Outputs = append(newOutputs.Outputs, out)
@@ -130,27 +182,6 @@ func (u *UTXOSet) Update(block *Block) {
 		return nil
 	})
 	Handle(err)
-}
-
-func (u UTXOSet) CountTransactions() int {
-	db := u.Blockchain.Database
-	counter := 0
-
-	err := db.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-
-		it := txn.NewIterator(opts)
-		defer it.Close()
-		for it.Seek(utxoPrefix); it.ValidForPrefix(utxoPrefix); it.Next() {
-			counter++
-		}
-
-		return nil
-	})
-
-	Handle(err)
-
-	return counter
 }
 
 func (u *UTXOSet) DeleteByPrefix(prefix []byte) {
@@ -196,38 +227,4 @@ func (u *UTXOSet) DeleteByPrefix(prefix []byte) {
 		}
 		return nil
 	})
-}
-
-// FindUnspentTransactions finds all unspent transactions for a given address
-func (u UTXOSet) FindUnspentTransactions(pubKeyHash []byte) []TxOutput {
-	var UTXOs []TxOutput
-
-	db := u.Blockchain.Database
-
-	err := db.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-
-		it := txn.NewIterator(opts)
-		defer it.Close()
-
-		for it.Seek(utxoPrefix); it.ValidForPrefix(utxoPrefix); it.Next() {
-			item := it.Item()
-			var v []byte
-			err := item.Value(func(val []byte) error {
-				v = val
-				return nil
-			})
-			Handle(err)
-			outs := DeserializeOutputs(v)
-			for _, out := range outs.Outputs {
-				if out.IsLockedWithKey(pubKeyHash) {
-					UTXOs = append(UTXOs, out)
-				}
-			}
-		}
-		return nil
-	})
-	Handle(err)
-
-	return UTXOs
 }

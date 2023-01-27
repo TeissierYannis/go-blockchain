@@ -15,12 +15,21 @@ import (
 	"strings"
 )
 
-// Transaction struct represents a transaction in the blockchain. It contains the transaction ID, inputs, and outputs.
-
 type Transaction struct {
 	ID      []byte
 	Inputs  []TxInput
 	Outputs []TxOutput
+}
+
+func (tx *Transaction) Hash() []byte {
+	var hash [32]byte
+
+	txCopy := *tx
+	txCopy.ID = []byte{}
+
+	hash = sha256.Sum256(txCopy.Serialize())
+
+	return hash[:]
 }
 
 func (tx Transaction) Serialize() []byte {
@@ -35,32 +44,25 @@ func (tx Transaction) Serialize() []byte {
 	return encoded.Bytes()
 }
 
-func (tx *Transaction) Hash() []byte {
-	var hash [32]byte
+func DeserializeTransaction(data []byte) Transaction {
+	var transaction Transaction
 
-	txCopy := *tx
-	txCopy.ID = []byte{}
-
-	hash = sha256.Sum256(txCopy.Serialize())
-
-	return hash[:]
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+	err := decoder.Decode(&transaction)
+	Handle(err)
+	return transaction
 }
 
-// CoinbaseTx creates a new coinbase transaction with the given parameters.
-// CoinbaseTx The function takes the recipient address and an optional data string.
-// CoinbaseTx If data is not provided, it will be set to "Coins to [recipient address]".
 func CoinbaseTx(to, data string) *Transaction {
 	if data == "" {
 		randData := make([]byte, 24)
 		_, err := rand.Read(randData)
-		if err != nil {
-			log.Panic(err)
-		}
+		Handle(err)
 		data = fmt.Sprintf("%x", randData)
 	}
 
 	txin := TxInput{[]byte{}, -1, nil, []byte(data)}
-	txout := NewTXOutput(20, to)
+	txout := NewTXOutput(3000, to)
 
 	tx := Transaction{nil, []TxInput{txin}, []TxOutput{*txout}}
 	tx.ID = tx.Hash()
@@ -68,17 +70,10 @@ func CoinbaseTx(to, data string) *Transaction {
 	return &tx
 }
 
-// NewTransaction creates a new transaction with the given parameters.
-// NewTransaction The function takes the sender and recipient addresses, amount, and a reference to the blockchain.
-// NewTransaction The function uses the FindSpendableOutputs method to find spendable outputs and create the inputs for the new transaction.
-// NewTransaction If the sender does not have enough funds, the function will panic.
-func NewTransaction(from, to string, amount int, UTXO *UTXOSet) *Transaction {
+func NewTransaction(w *wallet.Wallet, to string, amount int, UTXO *UTXOSet) *Transaction {
 	var inputs []TxInput
 	var outputs []TxOutput
 
-	wallets, err := wallet.CreateWallets()
-	Handle(err)
-	w := wallets.GetWallet(from)
 	pubKeyHash := wallet.PublicKeyHash(w.PublicKey)
 	acc, validOutputs := UTXO.FindSpendableOutputs(pubKeyHash, amount)
 
@@ -96,6 +91,8 @@ func NewTransaction(from, to string, amount int, UTXO *UTXOSet) *Transaction {
 		}
 	}
 
+	from := fmt.Sprintf("%s", w.Address())
+
 	outputs = append(outputs, *NewTXOutput(amount, to))
 
 	if acc > amount {
@@ -109,7 +106,6 @@ func NewTransaction(from, to string, amount int, UTXO *UTXOSet) *Transaction {
 	return &tx
 }
 
-// IsCoinbase checks if a transaction is a coinbase transaction
 func (tx *Transaction) IsCoinbase() bool {
 	return len(tx.Inputs) == 1 && len(tx.Inputs[0].ID) == 0 && tx.Inputs[0].Out == -1
 }
@@ -121,7 +117,7 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transac
 
 	for _, in := range tx.Inputs {
 		if prevTXs[hex.EncodeToString(in.ID)].ID == nil {
-			log.Panic("ERROR: Previous transaction does not exist")
+			log.Panic("ERROR: Previous transaction is not correct")
 		}
 	}
 
@@ -131,16 +127,60 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transac
 		prevTX := prevTXs[hex.EncodeToString(in.ID)]
 		txCopy.Inputs[inId].Signature = nil
 		txCopy.Inputs[inId].PubKey = prevTX.Outputs[in.Out].PubKeyHash
-		txCopy.ID = txCopy.Hash()
-		txCopy.Inputs[inId].PubKey = nil
 
-		r, s, err := ecdsa.Sign(rand.Reader, &privKey, txCopy.ID)
+		dataToSign := fmt.Sprintf("%x\n", txCopy)
+
+		r, s, err := ecdsa.Sign(rand.Reader, &privKey, []byte(dataToSign))
 		Handle(err)
 		signature := append(r.Bytes(), s.Bytes()...)
 
 		tx.Inputs[inId].Signature = signature
-
+		txCopy.Inputs[inId].PubKey = nil
 	}
+}
+
+func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
+	if tx.IsCoinbase() {
+		return true
+	}
+
+	for _, in := range tx.Inputs {
+		if prevTXs[hex.EncodeToString(in.ID)].ID == nil {
+			log.Panic("Previous transaction not correct")
+		}
+	}
+
+	txCopy := tx.TrimmedCopy()
+	curve := elliptic.P256()
+
+	for inId, in := range tx.Inputs {
+		prevTx := prevTXs[hex.EncodeToString(in.ID)]
+		txCopy.Inputs[inId].Signature = nil
+		txCopy.Inputs[inId].PubKey = prevTx.Outputs[in.Out].PubKeyHash
+
+		r := big.Int{}
+		s := big.Int{}
+
+		sigLen := len(in.Signature)
+		r.SetBytes(in.Signature[:(sigLen / 2)])
+		s.SetBytes(in.Signature[(sigLen / 2):])
+
+		x := big.Int{}
+		y := big.Int{}
+		keyLen := len(in.PubKey)
+		x.SetBytes(in.PubKey[:(keyLen / 2)])
+		y.SetBytes(in.PubKey[(keyLen / 2):])
+
+		dataToVerify := fmt.Sprintf("%x\n", txCopy)
+
+		rawPubKey := ecdsa.PublicKey{Curve: curve, X: &x, Y: &y}
+		if ecdsa.Verify(&rawPubKey, []byte(dataToVerify), &r, &s) == false {
+			return false
+		}
+		txCopy.Inputs[inId].PubKey = nil
+	}
+
+	return true
 }
 
 func (tx *Transaction) TrimmedCopy() Transaction {
@@ -158,47 +198,6 @@ func (tx *Transaction) TrimmedCopy() Transaction {
 	txCopy := Transaction{tx.ID, inputs, outputs}
 
 	return txCopy
-}
-
-func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
-	if tx.IsCoinbase() {
-		return true
-	}
-
-	for _, in := range tx.Inputs {
-		if prevTXs[hex.EncodeToString(in.ID)].ID == nil {
-			log.Panic("Previous transaction does not exist")
-		}
-	}
-
-	txCopy := tx.TrimmedCopy()
-	curve := elliptic.P256()
-
-	for inId, in := range tx.Inputs {
-		prevTx := prevTXs[hex.EncodeToString(in.ID)]
-		txCopy.Inputs[inId].Signature = nil
-		txCopy.Inputs[inId].PubKey = prevTx.Outputs[in.Out].PubKeyHash
-		txCopy.ID = txCopy.Hash()
-		txCopy.Inputs[inId].PubKey = nil
-
-		r := big.Int{}
-		s := big.Int{}
-		sigLen := len(in.Signature)
-		r.SetBytes(in.Signature[:(sigLen / 2)])
-		s.SetBytes(in.Signature[(sigLen / 2):])
-
-		x := big.Int{}
-		y := big.Int{}
-		keyLen := len(in.PubKey)
-		x.SetBytes(in.PubKey[:(keyLen / 2)])
-		y.SetBytes(in.PubKey[(keyLen / 2):])
-
-		rawPublicKey := ecdsa.PublicKey{curve, &x, &y}
-		if ecdsa.Verify(&rawPublicKey, txCopy.ID, &r, &s) == false {
-			return false
-		}
-	}
-	return true
 }
 
 func (tx Transaction) String() string {

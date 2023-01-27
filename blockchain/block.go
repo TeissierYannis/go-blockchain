@@ -4,18 +4,18 @@ import (
 	"bytes"
 	"encoding/gob"
 	"log"
+	"time"
 )
 
-// Block represents a block in a blockchain.
-// It contains a Hash, a slice of Transactions, the previous block's Hash, and a Nonce.
 type Block struct {
-	Hash         []byte         // Hash is the SHA-256 hash of the block
-	Transactions []*Transaction // Transactions is a slice of all the transactions in the block
-	PrevHash     []byte         // PrevHash is the hash of the previous block in the blockchain
-	Nonce        int            // Nonce is the number used to mine the block
+	Timestamp    int64
+	Hash         []byte
+	Transactions []*Transaction
+	PrevHash     []byte
+	Nonce        int
+	Height       int
 }
 
-// HashTransactions returns the SHA-256 hash of all the transactions in the block
 func (b *Block) HashTransactions() []byte {
 	var txHashes [][]byte
 
@@ -27,11 +27,8 @@ func (b *Block) HashTransactions() []byte {
 	return tree.RootNode.Data
 }
 
-// CreateBlock creates a new block with the given transactions and previous block's hash.
-// It also mines the block by calling the Run method of a new instance of the Proof of Work
-func CreateBlock(txs []*Transaction, prevHash []byte) *Block {
-	block := &Block{[]byte{}, txs, prevHash, 0}
-
+func CreateBlock(txs []*Transaction, prevHash []byte, height int) *Block {
+	block := &Block{time.Now().Unix(), []byte{}, txs, prevHash, 0, height}
 	pow := NewProof(block)
 	nonce, hash := pow.Run()
 
@@ -41,12 +38,10 @@ func CreateBlock(txs []*Transaction, prevHash []byte) *Block {
 	return block
 }
 
-// Genesis creates the first block in the blockchain with the given coinbase transaction
 func Genesis(coinbase *Transaction) *Block {
-	return CreateBlock([]*Transaction{coinbase}, []byte{})
+	return CreateBlock([]*Transaction{coinbase}, []byte{}, 0)
 }
 
-// Serialize converts a block struct to a slice of bytes
 func (b *Block) Serialize() []byte {
 	var res bytes.Buffer
 	encoder := gob.NewEncoder(&res)
@@ -58,20 +53,18 @@ func (b *Block) Serialize() []byte {
 	return res.Bytes()
 }
 
-// Deserialize converts a slice of bytes to a block struct
 func Deserialize(data []byte) *Block {
-	var Block Block
+	var block Block
 
 	decoder := gob.NewDecoder(bytes.NewReader(data))
 
-	err := decoder.Decode(&Block)
+	err := decoder.Decode(&block)
 
 	Handle(err)
 
-	return &Block
+	return &block
 }
 
-// Handle is a helper function to handle errors
 func Handle(err error) {
 	if err != nil {
 		log.Panic(err)
