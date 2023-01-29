@@ -24,6 +24,7 @@ func (cli *CommandLine) printUsage() {
 	fmt.Println(" listaddresses - Lists the addresses in our wallet file")
 	fmt.Println(" reindexutxo - Rebuilds the UTXO set")
 	fmt.Println(" startnode -miner ADDRESS - Start a node with ID specified in NODE_ID env. var. -miner enables mining")
+	fmt.Println(" listnodes - Lists all the nodes in the network")
 }
 
 func (cli *CommandLine) validateArgs() {
@@ -32,9 +33,8 @@ func (cli *CommandLine) validateArgs() {
 		runtime.Goexit()
 	}
 }
-
 func (cli *CommandLine) StartNode(nodeID, minerAddress string) {
-	fmt.Printf("Starting Node %s\n", nodeID)
+	fmt.Printf("Starting Node %s\n==========================================\nListening on\t\t127.0.0.1:%s\nPublic Interface on\t%s:%s\n==========================================\n\n", nodeID, nodeID, network.GetPublicIP(), nodeID)
 
 	if len(minerAddress) > 0 {
 		if wallet.ValidateAddress(minerAddress) {
@@ -63,10 +63,11 @@ func (cli *CommandLine) listAddresses(nodeID string) {
 	for _, address := range addresses {
 		fmt.Println(address)
 	}
-
 }
 
 func (cli *CommandLine) createWallet(nodeID string) {
+	// first create a folder named tmp
+	os.Mkdir("tmp", 0755)
 	wallets, _ := wallet.CreateWallets(nodeID)
 	address := wallets.AddWallet()
 	wallets.SaveFile(nodeID)
@@ -130,6 +131,10 @@ func (cli *CommandLine) getBalance(address, nodeID string) {
 	fmt.Printf("Balance of %s: %d\n", address, balance)
 }
 
+func (cli *CommandLine) listNodes() {
+	network.SendAddr(network.GetPublicIP() + ":6869")
+}
+
 func (cli *CommandLine) send(from, to string, amount int, nodeID string, mineNow bool) {
 	if !wallet.ValidateAddress(to) {
 		log.Panic("Address is not Valid")
@@ -178,6 +183,7 @@ func (cli *CommandLine) Run() {
 	listAddressesCmd := flag.NewFlagSet("listaddresses", flag.ExitOnError)
 	reindexUTXOCmd := flag.NewFlagSet("reindexutxo", flag.ExitOnError)
 	startNodeCmd := flag.NewFlagSet("startnode", flag.ExitOnError)
+	listNodesCmd := flag.NewFlagSet("listnodes", flag.ExitOnError)
 
 	getBalanceAddress := getBalanceCmd.String("address", "", "The address to get balance for")
 	createBlockchainAddress := createBlockchainCmd.String("address", "", "The address to send genesis block reward to")
@@ -228,6 +234,11 @@ func (cli *CommandLine) Run() {
 		if err != nil {
 			log.Panic(err)
 		}
+	case "listnodes":
+		err := listNodesCmd.Parse(os.Args[2:])
+		if err != nil {
+			log.Panic(err)
+		}
 	default:
 		cli.printUsage()
 		runtime.Goexit()
@@ -239,6 +250,10 @@ func (cli *CommandLine) Run() {
 			runtime.Goexit()
 		}
 		cli.getBalance(*getBalanceAddress, nodeID)
+	}
+
+	if listNodesCmd.Parsed() {
+		cli.listNodes()
 	}
 
 	if createBlockchainCmd.Parsed() {
@@ -278,6 +293,7 @@ func (cli *CommandLine) Run() {
 			startNodeCmd.Usage()
 			runtime.Goexit()
 		}
+
 		cli.StartNode(nodeID, *startNodeMiner)
 	}
 }

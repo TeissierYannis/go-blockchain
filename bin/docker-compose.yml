@@ -1,0 +1,54 @@
+version: '3.7'
+services:
+  node-1:
+    container_name: node-1
+    build:
+      context: .
+      dockerfile: Dockerfile.main
+    volumes:
+      - .:/app
+    environment:
+      - NODE_ID=6868
+      - NODE_LIST=6869,6870
+    ports:
+      - 6868:6868
+    command: sleep 1000
+  node-2:
+    container_name: node-2
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    volumes:
+      - .:/app
+    environment:
+      - NODE_ID=6869
+      - FIRST_NODE=6868
+    ports:
+      - 6869:6869
+    command: sleep 1000
+  node-3:
+    container_name: node-3
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    volumes:
+      - .:/app
+    environment:
+      - NODE_ID=6870
+      - FIRST_NODE=6868
+    ports:
+      - 6870:6870
+    command: sleep 1000
+  node-4:
+    container_name: node-4
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    volumes:
+      - .:/app
+    environment:
+      - NODE_ID=6871
+      - FIRST_NODE=6868
+    ports:
+      - 6871:6871
+    command: sleep 1000

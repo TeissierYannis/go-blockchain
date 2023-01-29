@@ -1,0 +1,16 @@
+version: '3.7'
+
+services:
+  go-builder:
+    build: .
+    working_dir: /app
+    volumes:
+      - app:/app
+    restart: on-failure
+volumes:
+  app:
+    driver: local
+    driver_opts:
+      type: none
+      device: .
+      o: bind
