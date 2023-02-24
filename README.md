@@ -6,12 +6,13 @@
 
 1.  [Project explanation](#project-explanation)
 2. [Tree structure](#tree-structure)
-3. [Using docker to mock a network of nodes](#using-docker-to-mock-a-network-of-nodes)
+3. [Build](#build)
+4. [Using docker to mock a network of nodes](#using-docker-to-mock-a-network-of-nodes)
    1. [Step 1 - Build the executable](#using-docker-to-mock-a-network-of-nodes-step1)
    2. [Step 2 - Build docker image](#using-docker-to-mock-a-network-of-nodes-step2)
    3. [Step 3 - Run the docker image](#using-docker-to-mock-a-network-of-nodes-step3)
-5. [Build](#build)
-5. [Usage](#usage)
+
+6. [Usage](#usage)
 
 
 # Project explanation <a id="project-explanation"></a>
@@ -83,7 +84,7 @@ This blockchain includes the following features:
 ```
 
 
-# Build
+# Build  <a id="build"></a>
 To build the executable file run the following command:
 ```sh
 go build
