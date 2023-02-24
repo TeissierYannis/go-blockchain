@@ -1,4 +1,4 @@
-[![GoDoc](https://godoc.org/github.com/abhishekkr/goshield?status.svg)](https://godoc.org/github.com/abhishekkr/goshield)
+[![GoDoc](https://godoc.org/github.com/abhishekkr/goshield?status.svg)](https://go.dev/doc/)
 [![Go version](https://img.shields.io/badge/Go_version-1.18-blue.svg)]()
 [![Type](https://img.shields.io/badge/Topic-Blockchain-blue.svg)]()
 
