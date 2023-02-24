@@ -79,8 +79,8 @@ This blockchain includes the following features:
 ├── wallet
 │   ├── utils.go
 │   ├── wallet.go
-│   ├── wallets.go
-
+│   ├── wallets.go
+```
 
 
 # Build
